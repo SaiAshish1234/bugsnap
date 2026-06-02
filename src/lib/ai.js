@@ -1,46 +1,85 @@
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+const MODELS = [
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-flash"
+];
 
 async function askGemini(prompt) {
-  const response = await fetch(GEMINI_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-    }),
-  });
-  const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  let lastError;
+
+  for (const model of MODELS) {
+    try {
+      const url =
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: prompt }]
+            }
+          ]
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error?.message || `HTTP ${response.status}`
+        );
+      }
+
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } catch (err) {
+      console.warn(`Model failed: ${model}`, err);
+      lastError = err;
+    }
+  }
+
+  throw lastError;
 }
 
 export async function analyzeError(errorText, language) {
-  const text = await askGemini(`
-    You are an expert software debugger. Analyze this ${language} error and respond ONLY with a JSON object — no markdown, no backticks, no explanation outside the JSON.
+  const prompt = `
+Return ONLY valid JSON.
 
-    Error:
-    "${errorText}"
+Schema:
+{
+  "what": string,
+  "why": string,
+  "fix": string,
+  "code": string,
+  "language": string,
+  "severity": "low" | "medium" | "high" | "critical"
+}
 
-    Respond with exactly this structure:
-    {
-      "what": "1-2 sentence plain English explanation of what went wrong",
-      "why": "1-2 sentence explanation of the root cause",
-      "fix": "1-2 sentence explanation of how to fix it",
-      "code": "the actual fix as a code snippet (2-5 lines max)",
-      "language": "detected programming language",
-      "severity": "low | medium | high | critical"
-    }
-  `);
+Analyze this ${language} error:
+
+${errorText}
+`;
+
+  const text = await askGemini(prompt);
 
   try {
-    const clean = text.replace(/```json|```/g, '').trim();
+    const clean = text
+      .replace(/```json/g, '')
+      .replace(/```/g, '')
+      .trim();
+
     return JSON.parse(clean);
   } catch {
     return {
-      what: 'Could not parse the error. Try rephrasing or adding more context.',
+      what: 'Could not parse the error.',
       why: 'The AI response was not in the expected format.',
-      fix: 'Please try again with a cleaner error message.',
+      fix: 'Please try again.',
       code: '',
-      language: language,
+      language,
       severity: 'medium',
     };
   }

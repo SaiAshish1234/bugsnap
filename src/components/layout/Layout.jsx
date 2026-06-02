@@ -49,7 +49,7 @@ export default function Layout() {
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             {[
               { label: 'STATUS', value: 'READY' },
-              { label: 'MODEL', value: 'GEMINI-2.5' },
+              { label: 'MODEL', value: 'GEMINI-1.5' },
               { label: 'BUGS FIXED', value: '0' },
             ].map(({ label, value }) => (
               <div key={label} style={{ fontSize: '0.58rem', color: 'rgba(0,255,65,0.25)', letterSpacing: '0.06em' }}>
