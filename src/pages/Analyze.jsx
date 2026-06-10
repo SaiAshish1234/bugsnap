@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { analyzeError, detectLanguage } from '../lib/ai';
 
-const LANGUAGES = ['Auto', 'JavaScript', 'Python', 'Java', 'React', 'Node.js', 'Ruby', 'Other'];
+const LANGUAGES = [
+  'Auto',
+  'JavaScript', 'TypeScript', 'Python', 'Java', 'React',
+  'Node.js', 'Go', 'Rust', 'C++', 'C#', 'PHP', 'Ruby',
+  'Swift', 'Kotlin', 'SQL', 'Bash', 'Other'
+];
 
 const SEVERITY_CONFIG = {
   low:      { color: '#00ff41', label: 'LOW' },
@@ -74,7 +79,7 @@ export default function Analyze() {
           <span style={{ fontSize: '0.6rem', color: 'rgba(0,255,65,0.25)', letterSpacing: '0.08em' }}>
             // paste your error or stack trace below
           </span>
-          <div style={{ display: 'flex', gap: '5px' }}>
+          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '500px' }}>
             {LANGUAGES.map(lang => (
               <button
                 key={lang}

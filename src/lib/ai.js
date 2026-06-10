@@ -47,7 +47,7 @@ async function askGemini(prompt) {
 
 export async function analyzeError(errorText, language) {
   const prompt = `
-Return ONLY valid JSON.
+Return ONLY valid JSON. No markdown, no backticks, no extra text.
 
 Schema:
 {
@@ -59,19 +59,23 @@ Schema:
   "severity": "low" | "medium" | "high" | "critical"
 }
 
-Analyze this ${language} error:
+You are an expert ${language} developer. Analyze this ${language} error and provide:
+- "what": A plain English explanation of what went wrong (1-2 sentences)
+- "why": The root cause of the error (1-2 sentences)  
+- "fix": Step-by-step fix instructions (2-3 sentences)
+- "code": A working code fix example in ${language} (just the code, no explanation)
+- "language": The programming language detected
+- "severity": How severe this error is
 
+Error to analyze:
 ${errorText}
 `;
 
   const text = await askGemini(prompt);
 
   try {
-    const clean = text
-      .replace(/```json/g, '')
-      .replace(/```/g, '')
-      .trim();
-
+    const match = text.match(/\{[\s\S]*\}/);
+    const clean = match ? match[0] : text.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(clean);
   } catch {
     return {
@@ -87,11 +91,51 @@ ${errorText}
 
 export function detectLanguage(errorText) {
   const text = errorText.toLowerCase();
-  if (text.includes('typeerror') || text.includes('referenceerror') || text.includes('syntaxerror') || text.includes('.jsx') || text.includes('.js')) return 'JavaScript';
+
+  // JavaScript / TypeScript
+  if (text.includes('typeerror') || text.includes('referenceerror') || text.includes('syntaxerror')) return 'JavaScript';
+  if (text.includes('.tsx') || text.includes('.ts')) return 'TypeScript';
+  if (text.includes('.jsx') || text.includes('.js')) return 'JavaScript';
+
+  // Python
   if (text.includes('traceback') || text.includes('nameerror') || text.includes('indentationerror') || text.includes('.py')) return 'Python';
+
+  // Java / Kotlin
   if (text.includes('nullpointerexception') || text.includes('classnotfoundexception') || text.includes('.java')) return 'Java';
+  if (text.includes('.kt') || text.includes('kotlin')) return 'Kotlin';
+
+  // Node.js
   if (text.includes('cannot find module') || text.includes('module not found')) return 'Node.js';
-  if (text.includes('.tsx') || text.includes('react')) return 'React';
-  if (text.includes('undefined method') || text.includes('.rb')) return 'Ruby';
-  return 'Auto';
+
+  // React
+  if (text.includes('.tsx') || text.includes('react') || text.includes('useeffect') || text.includes('usestate')) return 'React';
+
+  // Go
+  if (text.includes('goroutine') || text.includes('panic:') || text.includes('.go')) return 'Go';
+
+  // Rust
+  if (text.includes('borrow checker') || text.includes('ownership') || text.includes('.rs') || text.includes('cannot borrow')) return 'Rust';
+
+  // C++
+  if (text.includes('segmentation fault') || text.includes('undefined reference') || text.includes('.cpp') || text.includes('std::')) return 'C++';
+
+  // C#
+  if (text.includes('nullreferenceexception') || text.includes('.cs') || text.includes('system.')) return 'C#';
+
+  // PHP
+  if (text.includes('fatal error') || text.includes('.php') || text.includes('undefined variable')) return 'PHP';
+
+  // Ruby
+  if (text.includes('undefined method') || text.includes('.rb') || text.includes('nomethoderror')) return 'Ruby';
+
+  // Swift
+  if (text.includes('.swift') || text.includes('fatal error: unexpectedly found nil')) return 'Swift';
+
+  // SQL
+  if (text.includes('syntax error at') || text.includes('relation') || text.includes('column') && text.includes('does not exist')) return 'SQL';
+
+  // Bash
+  if (text.includes('command not found') || text.includes('permission denied') || text.includes('.sh')) return 'Bash';
+
+  return 'Unknown';
 }
