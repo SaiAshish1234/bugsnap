@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabaseClient';
 
 const SEVERITY_CONFIG = {
   low:      { color: '#00ff41', label: 'LOW' },
@@ -8,16 +10,51 @@ const SEVERITY_CONFIG = {
 };
 
 export default function History() {
+  const { user } = useAuth();
   const [history, setHistory] = useState([]);
   const [expanded, setExpanded] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem('bugsnap_history') || '[]');
-    setHistory(saved);
-  }, []);
+    loadHistory();
+  }, [user]);
 
-  const clearHistory = () => {
-    localStorage.removeItem('bugsnap_history');
+  const loadHistory = async () => {
+    setLoading(true);
+    if (user) {
+      const { data, error } = await supabase
+        .from('bug_history')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        const mapped = data.map((row) => ({
+          id: row.id,
+          errorText: row.error_text,
+          language: row.language,
+          timestamp: row.created_at,
+          result: {
+            severity: row.severity,
+            what: row.explanation,
+            why: row.explanation,
+            fix: row.fix_suggestion,
+          },
+        }));
+        setHistory(mapped);
+      }
+    } else {
+      const saved = JSON.parse(localStorage.getItem('bugsnap_history') || '[]');
+      setHistory(saved);
+    }
+    setLoading(false);
+  };
+
+  const clearHistory = async () => {
+    if (user) {
+      await supabase.from('bug_history').delete().eq('user_id', user.id);
+    } else {
+      localStorage.removeItem('bugsnap_history');
+    }
     setHistory([]);
   };
 
@@ -33,6 +70,11 @@ export default function History() {
         <span style={{ fontSize: '0.6rem', color: 'rgba(0,255,65,0.3)' }}>01</span>
         <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(0,255,65,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Error History</span>
         <div style={{ flex: 1, height: '1px', background: 'rgba(0,255,65,0.07)' }} />
+        {!user && (
+          <span style={{ fontSize: '0.58rem', color: 'rgba(255,183,0,0.5)', letterSpacing: '0.06em' }}>
+            // LOCAL ONLY — LOGIN TO SYNC
+          </span>
+        )}
         <span style={{ fontSize: '0.6rem', color: 'rgba(0,255,65,0.3)', letterSpacing: '0.06em' }}>
           {history.length} records
         </span>
@@ -52,7 +94,11 @@ export default function History() {
         )}
       </div>
 
-      {history.length === 0 ? (
+      {loading ? (
+        <div style={{ fontSize: '0.65rem', color: 'rgba(0,255,65,0.3)', letterSpacing: '0.08em' }}>
+          // LOADING...
+        </div>
+      ) : history.length === 0 ? (
         <div style={{
           background: '#0d100d',
           border: '1px solid rgba(0,255,65,0.08)',
@@ -81,7 +127,6 @@ export default function History() {
                   transition: 'border-color 0.15s',
                 }}
               >
-                {/* Row */}
                 <div
                   onClick={() => setExpanded(isExpanded ? null : item.id)}
                   style={{
@@ -124,7 +169,6 @@ export default function History() {
                   <i className={`ti ti-chevron-${isExpanded ? 'up' : 'down'}`} style={{ fontSize: '13px', color: 'rgba(0,255,65,0.3)', flexShrink: 0 }} />
                 </div>
 
-                {/* Expanded */}
                 {isExpanded && item.result && (
                   <div style={{ borderTop: '1px solid rgba(0,255,65,0.07)', padding: '0.875rem' }}>
                     {[

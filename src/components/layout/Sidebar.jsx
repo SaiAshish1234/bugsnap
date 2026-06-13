@@ -1,4 +1,7 @@
 import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import Auth from '../Auth';
 
 const NAV_ITEMS = [
   { label: 'analyze', href: '/', icon: 'ti-bug' },
@@ -6,6 +9,9 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar() {
+  const { user, signOut } = useAuth();
+  const [showAuth, setShowAuth] = useState(false);
+  
   return (
     <aside style={{
       position: 'fixed',
@@ -111,11 +117,47 @@ export default function Sidebar() {
         letterSpacing: '0.06em',
       }}>
         <div style={{ marginBottom: '3px' }}>GEMINI AI // ONLINE</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '0.75rem' }}>
           <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#00ff41', boxShadow: '0 0 4px #00ff41' }} />
           ALL SYSTEMS OPERATIONAL
         </div>
+
+        <div style={{ height: '1px', background: 'rgba(0,255,65,0.06)', margin: '0.5rem 0' }} />
+
+        {user ? (
+          <div>
+            <div style={{ color: 'rgba(0,255,65,0.4)', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user.email}
+            </div>
+            <button
+              onClick={signOut}
+              style={{
+                background: 'none', border: '1px solid rgba(255,49,49,0.2)',
+                borderRadius: '3px', padding: '2px 8px',
+                color: '#ff6b6b', fontSize: '0.58rem',
+                letterSpacing: '0.06em', cursor: 'pointer',
+              }}
+            >
+              LOGOUT
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowAuth(true)}
+            style={{
+              background: 'rgba(0,255,65,0.06)', border: '1px solid rgba(0,255,65,0.2)',
+              borderRadius: '3px', padding: '3px 8px',
+              color: '#00ff41', fontSize: '0.58rem',
+              letterSpacing: '0.06em', cursor: 'pointer',
+              width: '100%',
+            }}
+          >
+            LOGIN / SIGNUP
+          </button>
+        )}
       </div>
+
+      {showAuth && <Auth onClose={() => setShowAuth(false)} />}
     </aside>
   );
 }

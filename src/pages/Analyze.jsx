@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { analyzeError, detectLanguage } from '../lib/ai';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabaseClient';
 
 const LANGUAGES = [
   'Auto',
@@ -16,6 +18,7 @@ const SEVERITY_CONFIG = {
 };
 
 export default function Analyze() {
+  const { user } = useAuth();
   const [errorText, setErrorText] = useState('');
   const [language, setLanguage] = useState('Auto');
   const [result, setResult] = useState(null);
@@ -34,16 +37,27 @@ export default function Analyze() {
       const analysis = await analyzeError(errorText, detectedLang);
       setResult(analysis);
 
-      // Save to localStorage history
-      const history = JSON.parse(localStorage.getItem('bugsnap_history') || '[]');
-      history.unshift({
-        id: Date.now(),
-        errorText: errorText.slice(0, 100),
-        language: detectedLang,
-        result: analysis,
-        timestamp: new Date().toISOString(),
-      });
-      localStorage.setItem('bugsnap_history', JSON.stringify(history.slice(0, 50)));
+      // Save to history (Supabase if logged in, else localStorage)
+      if (user) {
+        await supabase.from('bug_history').insert({
+          user_id: user.id,
+          error_text: errorText.slice(0, 100),
+          language: detectedLang,
+          severity: analysis.severity,
+          explanation: `${analysis.what}\n\n${analysis.why}`,
+          fix_suggestion: analysis.code ? `${analysis.fix}\n\n${analysis.code}` : analysis.fix,
+        });
+      } else {
+        const history = JSON.parse(localStorage.getItem('bugsnap_history') || '[]');
+        history.unshift({
+          id: Date.now(),
+          errorText: errorText.slice(0, 100),
+          language: detectedLang,
+          result: analysis,
+          timestamp: new Date().toISOString(),
+        });
+        localStorage.setItem('bugsnap_history', JSON.stringify(history.slice(0, 50)));
+      }
     } catch {
       setError('Analysis failed. Check your API key or try again.');
     }
