@@ -24,12 +24,15 @@ export default function Analyze() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [shareLink, setShareLink] = useState('');
+  const [sharing, setSharing] = useState(false);
 
   const handleAnalyze = async () => {
     if (!errorText.trim()) return;
     setLoading(true);
     setError('');
     setResult(null);
+    setShareLink('');
 
     const detectedLang = language === 'Auto' ? detectLanguage(errorText) : language;
 
@@ -62,6 +65,37 @@ export default function Analyze() {
       setError('Analysis failed. Check your API key or try again.');
     }
     setLoading(false);
+  };
+
+  const handleShare = async () => {
+    if (!user || !result) return;
+    setSharing(true);
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    const { data, error: shareError } = await supabase
+      .from('shared_fixes')
+      .insert({
+        user_id: user.id,
+        error_text: errorText,
+        language: result.language,
+        severity: result.severity,
+        explanation: `${result.what}\n\n${result.why}`,
+        fix_suggestion: result.fix,
+        code: result.code || null,
+        expires_at: expiresAt.toISOString(),
+      })
+      .select()
+      .single();
+
+    setSharing(false);
+
+    if (!shareError && data) {
+      const link = `${window.location.origin}/share/${data.id}`;
+      setShareLink(link);
+      navigator.clipboard.writeText(link);
+    }
   };
 
   const severity = result ? SEVERITY_CONFIG[result.severity] || SEVERITY_CONFIG.medium : null;
@@ -149,7 +183,7 @@ export default function Analyze() {
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {errorText && (
               <button
-                onClick={() => { setErrorText(''); setResult(null); }}
+                onClick={() => { setErrorText(''); setResult(null); setShareLink(''); }}
                 style={{
                   fontSize: '0.62rem', padding: '0.3rem 0.75rem',
                   background: 'transparent',
@@ -217,7 +251,7 @@ export default function Analyze() {
       {/* Results */}
       {result && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.6rem', color: 'rgba(0,255,65,0.3)' }}>02</span>
             <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(0,255,65,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>AI Analysis Output</span>
             <div style={{ flex: 1, height: '1px', background: 'rgba(0,255,65,0.07)' }} />
@@ -242,7 +276,46 @@ export default function Analyze() {
             }}>
               {result.language?.toUpperCase()}
             </div>
+            {/* Share button */}
+            {user && (
+              <button
+                onClick={handleShare}
+                disabled={sharing}
+                style={{
+                  fontSize: '0.6rem', fontWeight: 700,
+                  padding: '2px 10px', borderRadius: '3px',
+                  border: '1px solid rgba(0,255,65,0.25)',
+                  background: 'rgba(0,255,65,0.06)',
+                  color: '#00ff41',
+                  cursor: sharing ? 'default' : 'pointer',
+                  letterSpacing: '0.1em',
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                }}
+              >
+                <i className="ti ti-link" style={{ fontSize: '11px' }} />
+                {sharing ? 'SHARING...' : shareLink ? 'LINK COPIED ✓' : 'SHARE'}
+              </button>
+            )}
           </div>
+
+          {/* Share link display */}
+          {shareLink && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              background: 'rgba(0,255,65,0.05)',
+              border: '1px solid rgba(0,255,65,0.15)',
+              borderRadius: '4px', padding: '0.5rem 0.75rem',
+              marginBottom: '1rem',
+            }}>
+              <i className="ti ti-check" style={{ fontSize: '12px', color: '#00ff41' }} />
+              <span style={{ fontSize: '0.62rem', color: 'rgba(0,255,65,0.5)', letterSpacing: '0.04em' }}>
+                Link copied (expires in 7 days):
+              </span>
+              <span style={{ fontSize: '0.62rem', color: '#00ff41', letterSpacing: '0.02em', wordBreak: 'break-all' }}>
+                {shareLink}
+              </span>
+            </div>
+          )}
 
           <div style={{
             background: '#0d100d',
